@@ -1,4 +1,6 @@
-pt/unl/fct/pds/project2/model/Circuit.class
 pt/unl/fct/pds/Project2.class
+pt/unl/fct/pds/project2/utils/GeoIPUtils.class
+pt/unl/fct/pds/project2/model/Circuit.class
 pt/unl/fct/pds/project2/model/Node.class
+pt/unl/fct/pds/project2/utils/PathSelector.class
 pt/unl/fct/pds/project2/utils/ConsensusParser.class

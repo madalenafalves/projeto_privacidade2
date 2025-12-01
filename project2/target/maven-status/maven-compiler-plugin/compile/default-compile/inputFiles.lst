@@ -1,4 +1,6 @@
-/home/user/Work/Nova/Teaching/SystemsPrivacy/2526/Projects/Project2/Code/project2/src/main/java/pt/unl/fct/pds/Project2.java
-/home/user/Work/Nova/Teaching/SystemsPrivacy/2526/Projects/Project2/Code/project2/src/main/java/pt/unl/fct/pds/model/Circuit.java
-/home/user/Work/Nova/Teaching/SystemsPrivacy/2526/Projects/Project2/Code/project2/src/main/java/pt/unl/fct/pds/utils/ConsensusParser.java
-/home/user/Work/Nova/Teaching/SystemsPrivacy/2526/Projects/Project2/Code/project2/src/main/java/pt/unl/fct/pds/model/Node.java
+/Users/madalenaalves/Documents/GitHub/projeto_privacidade2/project2/src/main/java/pt/unl/fct/pds/Project2.java
+/Users/madalenaalves/Documents/GitHub/projeto_privacidade2/project2/src/main/java/pt/unl/fct/pds/model/Circuit.java
+/Users/madalenaalves/Documents/GitHub/projeto_privacidade2/project2/src/main/java/pt/unl/fct/pds/model/Node.java
+/Users/madalenaalves/Documents/GitHub/projeto_privacidade2/project2/src/main/java/pt/unl/fct/pds/utils/ConsensusParser.java
+/Users/madalenaalves/Documents/GitHub/projeto_privacidade2/project2/src/main/java/pt/unl/fct/pds/utils/GeoIPUtils.java
+/Users/madalenaalves/Documents/GitHub/projeto_privacidade2/project2/src/main/java/pt/unl/fct/pds/utils/PathSelector.java
