@@ -16,6 +16,8 @@ public class Node {
     private String country;
     private String exitPolicy;
 
+    public double tempWeight;
+
     public Node() {}
 
     public Node(
@@ -42,6 +44,7 @@ public class Node {
         this.bandwidth = bandwidth;
         this.country = country;
         this.exitPolicy = exitPolicy;
+        this.tempWeight = 0;
     }
 
     public String getNickname() {return nickname;}

@@ -1,21 +1,124 @@
 package pt.unl.fct.pds.project2.utils;
 
 import pt.unl.fct.pds.project2.model.Node;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 public class PathSelector {
 
-    private Node[] consensus;
+    private List<Node> relays;
+    private Random random = new Random();
 
-    public PathSelector(Node[] consensus) {
-        this.consensus = consensus;
+    public PathSelector(List<Node> relays) {
+        this.relays = relays;
     }
 
-    /**
-     * Função principal que seleciona o circuito completo
-     */
+    
+    private boolean hasFlag(Node n, String flag) {
+        for (String f : n.getFlags()) {
+            if (f.equalsIgnoreCase(flag)) return true;
+        }
+        return false;
+    }
+
+    // Exit policy simplificada: aceita qualquer um com ExitPolicy != "reject"
+    private boolean canExit(Node n) {
+        return !n.getExitPolicy().toLowerCase().contains("reject");
+    }
+
+    private boolean same16Subnet(Node a, Node b) {
+        // compara os primeiros dois octetos
+        try {
+            String[] A = a.getIpAddress().split("\\.");
+            String[] B = b.getIpAddress().split("\\.");
+            return A[0].equals(B[0]) && A[1].equals(B[1]);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+
+    private List<Node> filterExit() {
+        List<Node> list = new ArrayList<>();
+        for (Node n : relays) {
+            if (hasFlag(n, "Fast") && canExit(n)) {
+                list.add(n);
+            }
+        }
+        return list;
+    }
+
+    private List<Node> filterGuard(Node exit) {
+        List<Node> list = new ArrayList<>();
+        for (Node n : relays) {
+            if (hasFlag(n, "Guard") && !same16Subnet(n, exit)) {
+                list.add(n);
+            }
+        }
+        return list;
+    }
+
+    private List<Node> filterMiddle(Node guard, Node exit) {
+        List<Node> list = new ArrayList<>();
+        for (Node n : relays) {
+            if (hasFlag(n, "Fast") &&
+                    !same16Subnet(n, guard) &&
+                    !same16Subnet(n, exit)) {
+                list.add(n);
+            }
+        }
+        return list;
+    }
+
+
+    private Node weightedRandomBandwidth(List<Node> list) {
+        double total = 0;
+        for (Node n : list) total += n.getBandwidth();
+
+        double r = random.nextDouble() * total;
+        double accum = 0;
+
+        for (Node n : list) {
+            accum += n.getBandwidth();
+            if (accum >= r) return n;
+        }
+        return list.get(list.size() - 1);
+    }
+
+    private Node weightedRandomTemp(List<Node> list) {
+        double total = 0;
+        for (Node n : list) {
+            total += n.tempWeight;
+        }
+
+        double r = random.nextDouble() * total;
+        double accum = 0;
+
+        for (Node n : list) {
+            accum += n.tempWeight;
+            if (accum >= r) return n;
+        }
+        return list.get(list.size() - 1);
+    }
+
+
+    public Node selectExit() {
+        List<Node> exits = filterExit();
+        return weightedRandomBandwidth(exits);
+    }
+
+    public Node selectGuard(Node exit) {
+        List<Node> guards = filterGuard(exit);
+        return weightedRandomBandwidth(guards);
+    }
+
+    public Node selectMiddle(Node guard, Node exit) {
+        List<Node> mids = filterMiddle(guard, exit);
+        return weightedRandomBandwidth(mids);
+    }
+
     public Node[] selectPath() {
         Node exit = selectExit();
         Node guard = selectGuard(exit);
@@ -23,101 +126,53 @@ public class PathSelector {
         return new Node[]{guard, middle, exit};
     }
 
-    /**
-     * Seleciona o Exit Node
-     * Regras: flag Fast + exit policy adequada
-     */
-    private Node selectExit() {
-        List<Node> candidates = new ArrayList<>();
-        for (Node node : consensus) {
-            if (hasFlag(node, "Fast") && suitableExit(node)) {
-                candidates.add(node);
+
+    public Node selectGuardGeo(Node exit, double alpha) {
+        List<Node> guards = filterGuard(exit);
+
+        for (Node g : guards) {
+            double w = g.getBandwidth();
+
+            // aplica α se for país diferente
+            if (!g.getCountry().equalsIgnoreCase(exit.getCountry())) {
+                w *= (1 + alpha);
             }
-        }
-        return weightedSample(candidates);
-    }
 
-    /**
-     * Seleciona o Guard Node
-     * Regras: flag Guard, remover nodes da mesma família ou mesmo /16 subnet do Exit
-     */
-    private Node selectGuard(Node exit) {
-        List<Node> candidates = new ArrayList<>();
-        for (Node node : consensus) {
-            if (hasFlag(node, "Guard") &&
-                !sameSubnet16(node.getIpAddress(), exit.getIpAddress()) &&
-                !sameFamily(node, exit)) {
-                candidates.add(node);
-            }
-        }
-        return weightedSample(candidates);
-    }
-
-    /**
-     * Seleciona o Middle Node
-     * Regras: flag Fast, remover nodes da mesma família ou mesmo /16 subnet do Guard ou Exit
-     */
-    private Node selectMiddle(Node guard, Node exit) {
-        List<Node> candidates = new ArrayList<>();
-        for (Node node : consensus) {
-            if (hasFlag(node, "Fast") &&
-                !sameSubnet16(node.getIpAddress(), guard.getIpAddress()) &&
-                !sameSubnet16(node.getIpAddress(), exit.getIpAddress()) &&
-                !sameFamily(node, guard) &&
-                !sameFamily(node, exit)) {
-                candidates.add(node);
-            }
-        }
-        return weightedSample(candidates);
-    }
-
-    /** ---------------- Funções auxiliares ---------------- **/
-
-    private boolean hasFlag(Node node, String flag) {
-        if (node.getFlags() == null) return false;
-        for (String f : node.getFlags()) {
-            if (f.equals(flag)) return true;
-        }
-        return false;
-    }
-
-    private boolean suitableExit(Node node) {
-        // Para simplificação, vamos assumir que todas as policies são adequadas
-        return true;
-    }
-
-    private boolean sameFamily(Node a, Node b) {
-        // Família = mesma primeira parte do fingerprint (exemplo simplificado: 8 primeiros chars)
-        if (a.getFingerprint() == null || b.getFingerprint() == null) return false;
-        return a.getFingerprint().substring(0, 8).equals(b.getFingerprint().substring(0, 8));
-    }
-
-    private boolean sameSubnet16(String ip1, String ip2) {
-        // Apenas IPv4 por agora
-        String[] parts1 = ip1.split("\\.");
-        String[] parts2 = ip2.split("\\.");
-        return parts1[0].equals(parts2[0]) && parts1[1].equals(parts2[1]);
-    }
-
-    private Node weightedSample(List<Node> candidates) {
-        if (candidates.isEmpty()) return null;
-
-        // Calcular soma das bandwidths
-        int total = 0;
-        for (Node node : candidates) {
-            total += node.getBandwidth();
+            g.tempWeight = w;
         }
 
-        // Amostragem ponderada por Wi / Wt
-        Random rand = new Random();
-        int r = rand.nextInt(total);
-        int cumulative = 0;
-        for (Node node : candidates) {
-            cumulative += node.getBandwidth();
-            if (r < cumulative) return node;
+        return weightedRandomTemp(guards);
+    }
+
+    public Node selectMiddleGeo(Node guard, Node exit, double beta) {
+        List<Node> mids = filterMiddle(guard, exit);
+
+        for (Node m : mids) {
+            double w = m.getBandwidth();
+            String c = m.getCountry();
+
+            int shared = 0;
+            if (c.equalsIgnoreCase(guard.getCountry())) shared++;
+            if (c.equalsIgnoreCase(exit.getCountry())) shared++;
+
+            int factor;
+
+            if (shared == 0) factor = 3;      // país único
+            else if (shared == 1) factor = 2; // partilha com 1
+            else factor = 1;                  // partilha com 2
+
+            w *= (1 + beta * factor);
+
+            m.tempWeight = w;
         }
 
-        // fallback
-        return candidates.get(candidates.size() - 1);
+        return weightedRandomTemp(mids);
+    }
+
+    public Node[] selectPathGeo(double alpha, double beta) {
+        Node exit = selectExit();
+        Node guard = selectGuardGeo(exit, alpha);
+        Node middle = selectMiddleGeo(guard, exit, beta);
+        return new Node[]{guard, middle, exit};
     }
 }
