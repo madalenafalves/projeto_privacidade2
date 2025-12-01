@@ -3,6 +3,7 @@ package pt.unl.fct.pds;
 import pt.unl.fct.pds.project2.model.Node;
 import pt.unl.fct.pds.project2.model.Circuit;
 import pt.unl.fct.pds.project2.utils.ConsensusParser;
+import pt.unl.fct.pds.project2.utils.PathSelector;
 
 import java.util.*;
 
@@ -13,7 +14,8 @@ public class Project2 {
 
         // Carregar nodes do consensus
         ConsensusParser parser = new ConsensusParser("consensus.txt");
-        Node[] allNodes = parser.parseConsensus();
+        Node[] allNodesArray = parser.parseConsensus();
+        List<Node> allNodes = Arrays.asList(allNodesArray);
 
         int numCircuits = 1000;
         double alpha = 0.5;
@@ -32,10 +34,14 @@ public class Project2 {
         Map<Node,Integer> globalCountsNew = new HashMap<>();
         List<Integer> bandwidthsNew = new ArrayList<>();
 
+        PathSelector selector = new PathSelector(allNodes);
+
         // Simulações
         for (int i = 0; i < numCircuits; i++) {
-            Circuit circuitOld = selectPathCurrent(allNodes);
-            Circuit circuitNew = selectPathNew(allNodes, alpha, beta);
+            // Algoritmo original
+            Circuit circuitOld = selectPathCurrent(selector);
+            // Algoritmo geográfico
+            Circuit circuitNew = selectPathNew(selector, alpha, beta);
 
             updateCounts(circuitOld, globalCountsOld, guardCountsOld, middleCountsOld, exitCountsOld, bandwidthsOld);
             updateCounts(circuitNew, globalCountsNew, guardCountsNew, middleCountsNew, exitCountsNew, bandwidthsNew);
@@ -103,63 +109,13 @@ public class Project2 {
     }
 
     // ================= Algoritmos =================
-    public static Circuit selectPathCurrent(Node[] nodes) {
-        Node guard = sampleRandom(nodes);
-        Node middle = sampleRandom(nodes);
-        Node exit = sampleRandom(nodes);
-        return new Circuit(0, new Node[]{guard, middle, exit}, calculateMinBandwidth(guard, middle, exit));
+    public static Circuit selectPathCurrent(PathSelector selector) {
+        Node[] path = selector.selectPath();
+        return new Circuit(0, path, calculateMinBandwidth(path[0], path[1], path[2]));
     }
 
-    public static Circuit selectPathNew(Node[] nodes, double alpha, double beta) {
-        Node exit = sampleRandom(nodes);
-        Node guard = sampleWeightedGuard(nodes, exit, alpha);
-        Node middle = sampleWeightedMiddle(nodes, guard, exit, beta);
-        return new Circuit(0, new Node[]{guard, middle, exit}, calculateMinBandwidth(guard, middle, exit));
-    }
-
-    public static Node sampleRandom(Node[] nodes) {
-        Random rand = new Random();
-        return nodes[rand.nextInt(nodes.length)];
-    }
-
-    // ================= Ponderação geográfica =================
-    public static Node sampleWeightedGuard(Node[] nodes, Node exit, double alpha) {
-        // Pesos baseados em bandwidth
-        List<Double> weights = new ArrayList<>();
-        for (Node n : nodes) {
-            double w = n.getBandwidth();
-            if (!n.getCountry().equals(exit.getCountry())) {
-                w *= (1 + alpha); // aumenta peso se país diferente
-            }
-            weights.add(w);
-        }
-        return weightedSample(nodes, weights);
-    }
-
-    public static Node sampleWeightedMiddle(Node[] nodes, Node guard, Node exit, double beta) {
-        List<Double> weights = new ArrayList<>();
-        for (Node n : nodes) {
-            double w = n.getBandwidth();
-            int c = 1;
-            boolean diffGuard = !n.getCountry().equals(guard.getCountry());
-            boolean diffExit = !n.getCountry().equals(exit.getCountry());
-            if (diffGuard && diffExit) c = 3;
-            else if (diffGuard || diffExit) c = 2;
-            w *= (1 + beta * c);
-            weights.add(w);
-        }
-        return weightedSample(nodes, weights);
-    }
-
-    // ================= Amostragem ponderada =================
-    public static Node weightedSample(Node[] nodes, List<Double> weights) {
-        double sum = weights.stream().mapToDouble(d -> d).sum();
-        double r = Math.random() * sum;
-        double acc = 0;
-        for (int i = 0; i < nodes.length; i++) {
-            acc += weights.get(i);
-            if (r <= acc) return nodes[i];
-        }
-        return nodes[nodes.length - 1]; // fallback
+    public static Circuit selectPathNew(PathSelector selector, double alpha, double beta) {
+        Node[] path = selector.selectPathGeo(alpha, beta);
+        return new Circuit(0, path, calculateMinBandwidth(path[0], path[1], path[2]));
     }
 }

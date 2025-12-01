@@ -1,25 +1,26 @@
 package pt.unl.fct.pds.project2.utils;
 
 import pt.unl.fct.pds.project2.model.Node;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
 
 import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.exception.GeoIp2Exception;
 import com.maxmind.geoip2.model.CountryResponse;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.net.InetAddress;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 
 public class ConsensusParser {
 
     private String filename;
     private static DatabaseReader geoIpReader;
 
+    // Inicializa o GeoIPReader de forma consistente
     static {
         try {
             File database = new File(ConsensusParser.class.getClassLoader()
@@ -27,30 +28,47 @@ public class ConsensusParser {
             geoIpReader = new DatabaseReader.Builder(database).build();
         } catch (IOException e) {
             e.printStackTrace();
+            System.err.println("Falha ao carregar GeoLite2-Country.mmdb");
         }
     }
 
     public ConsensusParser() {}
 
-    public ConsensusParser(String filename) { this.filename = filename; }
+    public ConsensusParser(String filename) {
+        this.filename = filename;
+    }
 
     public String getFilename() { return filename; }
+
     public void setFilename(String filename) { this.filename = filename; }
 
     public Node[] parseConsensus() {
         ArrayList<Node> nodes = new ArrayList<>();
+        Node currentNode = null;
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
         try (BufferedReader br = new BufferedReader(new FileReader(this.filename))) {
             String line;
-            Node currentNode = null;
-
             while ((line = br.readLine()) != null) {
+
                 if (line.startsWith("r ")) {
-                    // Ex: r Nickname Fingerprint Digest PublicationTime IP ORPort DirPort
+                    // r Nickname Fingerprint Digest PublicationTime IP ORPort DirPort
                     String[] parts = line.split(" ");
+                    if (parts.length < 8) continue; // evitar linhas inválidas
+
                     String nickname = parts[1];
                     String fingerprint = parts[2];
                     String pubTimeStr = parts[4];
-                    LocalDateTime timePublished = LocalDateTime.parse(pubTimeStr, DateTimeFormatter.ISO_DATE_TIME);
+                    LocalDateTime timePublished;
+
+                    try {
+                        timePublished = LocalDateTime.parse(pubTimeStr, formatter);
+                    } catch (Exception e) {
+                        // fallback para ISO
+                        timePublished = LocalDateTime.parse(pubTimeStr);
+                    }
+
                     String ip = parts[5];
                     int orPort = Integer.parseInt(parts[6]);
                     int dirPort = Integer.parseInt(parts[7]);
@@ -72,17 +90,20 @@ public class ConsensusParser {
                     currentNode.setVersion(line.substring(2));
 
                 } else if (line.startsWith("w ") && currentNode != null) {
-                    // Ex: w Bandwidth=12345
-                    String[] parts = line.split("=");
-                    int bandwidth = Integer.parseInt(parts[1]);
-                    currentNode.setBandwidth(bandwidth);
+                    try {
+                        String[] parts = line.split("=");
+                        int bandwidth = Integer.parseInt(parts[1]);
+                        currentNode.setBandwidth(bandwidth);
+                    } catch (Exception e) {
+                        currentNode.setBandwidth(0);
+                    }
 
                 } else if (line.startsWith("p ") && currentNode != null) {
                     currentNode.setExitPolicy(line.substring(2));
                 }
             }
 
-            // Preencher país via GeoIP
+            // Preencher country via GeoIP
             for (Node node : nodes) {
                 node.setCountry(getCountry(node.getIpAddress()));
             }
@@ -98,9 +119,11 @@ public class ConsensusParser {
         try {
             InetAddress inet = InetAddress.getByName(ip);
             CountryResponse response = geoIpReader.country(inet);
-            return response.getCountry().getIsoCode();
+            if (response.getCountry() != null && response.getCountry().getIsoCode() != null) {
+                return response.getCountry().getIsoCode();
+            }
         } catch (IOException | GeoIp2Exception e) {
-            e.printStackTrace();
+            // Ignorar e retornar "Unknown"
         }
         return "Unknown";
     }
