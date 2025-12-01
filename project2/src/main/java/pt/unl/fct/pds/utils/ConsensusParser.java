@@ -28,7 +28,7 @@ public class ConsensusParser {
             geoIpReader = new DatabaseReader.Builder(database).build();
         } catch (IOException e) {
             e.printStackTrace();
-            System.err.println("Falha ao carregar GeoLite2-Country.mmdb");
+            System.err.println("Fail loading GeoLite2-Country.mmdb");
         }
     }
 
