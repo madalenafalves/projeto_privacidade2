@@ -15,10 +15,16 @@ public class Project2 {
         System.out.println("Welcome to the Circuit Simulator!");
 
         // ---------------- Carregar nodes do consensus ----------------
-        ConsensusParser parser = new ConsensusParser("consensus.txt");
+        ConsensusParser parser = new ConsensusParser("src/main/resources/consensus.txt"); // Caminho correto
         Node[] allNodesArray = parser.parseConsensus();
-        List<Node> allNodes = Arrays.asList(allNodesArray);
 
+        if (allNodesArray == null || allNodesArray.length < 3) {
+            System.err.println("Erro: não há nodes suficientes para construir circuitos!");
+            System.err.println("Nodes carregados: " + (allNodesArray != null ? allNodesArray.length : 0));
+            return; // Sai do programa
+        }
+
+        List<Node> allNodes = Arrays.asList(allNodesArray);
         PathSelector selector = new PathSelector(allNodes);
 
         // ---------------- Parâmetros da simulação ----------------
@@ -95,6 +101,7 @@ public class Project2 {
                                      Map<Node,Integer> exitCounts, Map<Node,Integer> globalCounts,
                                      List<Integer> bandwidths) {
         Node[] nodes = circuit.getNodes();
+        if (nodes == null || nodes.length < 3) return; // Evita IndexOutOfBounds
 
         // Diversidade
         guardSet.add(nodes[0]);
@@ -134,6 +141,7 @@ public class Project2 {
     }
 
     public static String summarizeBandwidth(List<Integer> bandwidths) {
+        if (bandwidths.isEmpty()) return "No data";
         int min = Integer.MAX_VALUE;
         int max = Integer.MIN_VALUE;
         double sum = 0;
@@ -162,11 +170,13 @@ public class Project2 {
     // ================= Algoritmos =================
     public static Circuit selectPathCurrent(PathSelector selector) {
         Node[] path = selector.selectPath();
+        if (path == null || path.length < 3) return new Circuit(0, new Node[0], 0);
         return new Circuit(0, path, calculateMinBandwidth(path[0], path[1], path[2]));
     }
 
     public static Circuit selectPathNew(PathSelector selector, double alpha, double beta) {
         Node[] path = selector.selectPathGeo(alpha, beta);
+        if (path == null || path.length < 3) return new Circuit(0, new Node[0], 0);
         return new Circuit(0, path, calculateMinBandwidth(path[0], path[1], path[2]));
     }
 }
